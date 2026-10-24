@@ -109,33 +109,41 @@ class WhatsAppNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    private fun extractRemoteInputAction(notification: Notification, conversationId: String, notificationKey: String) {
-        val actions = NotificationCompat.getActionCount(notification)
-        for (i in 0 until actions) {
-            val action = NotificationCompat.getAction(notification, i) ?: continue
-            val remoteInputs = action.remoteInputs ?: continue
+    
+private fun extractRemoteInputAction(
+    notification: Notification,
+    conversationId: String,
+    notificationKey: String
+) {
+    val actions = NotificationCompat.getActionCount(notification)
 
-            
-for (ri in remoteInputs) {
-    val pendingIntent = action.actionIntent ?: continue
-    val resultKey = ri.resultKey ?: continue
+    for (i in 0 until actions) {
+        val action = NotificationCompat.getAction(notification, i) ?: continue
+        val remoteInputs = action.remoteInputs ?: continue
+        val pendingIntent = action.actionIntent ?: continue
 
-    val nativeRemoteInput = RemoteInput.Builder(resultKey)
-        .setLabel(ri.label)
-        .setChoices(ri.choices)
-        .setAllowFreeFormInput(ri.allowFreeFormInput)
-        .build()
+        for (remoteInput in remoteInputs) {
+            val resultKey = remoteInput.resultKey ?: continue
 
-    activeRemoteInputs[conversationId] = RemoteInputActionHolder(
-        pendingIntent = pendingIntent,
-        remoteInput = nativeRemoteInput,
-        notificationKey = notificationKey,
-        timestamp = System.currentTimeMillis()
-    )
-    Log.d(TAG, "Acción RemoteInput registrada para: $conversationId")
-    return
-}
+            val nativeRemoteInput = RemoteInput.Builder(resultKey)
+                .setLabel(remoteInput.label)
+                .setChoices(remoteInput.choices)
+                .setAllowFreeFormInput(remoteInput.allowFreeFormInput)
+                .build()
 
+            activeRemoteInputs[conversationId] = RemoteInputActionHolder(
+                pendingIntent = pendingIntent,
+                remoteInput = nativeRemoteInput,
+                notificationKey = notificationKey,
+                timestamp = System.currentTimeMillis()
+            )
+
+            Log.d(TAG, "Acción RemoteInput registrada para: $conversationId")
+            return
         }
     }
+
+    Log.d(TAG, "No se encontró acción de respuesta para: $conversationId")
 }
+
+    }

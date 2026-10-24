@@ -9,10 +9,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,7 +42,6 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MinimalMainScreen() {
-    var selectedTab by remember { mutableIntStateOf(0) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
     val dao = remember(context) {
@@ -56,69 +51,49 @@ fun MinimalMainScreen() {
     val conversations by dao.getAllConversations()
         .collectAsState(initial = emptyList())
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    icon = {
-                        Icon(
-                            Icons.Default.ChatBubbleOutline,
-                            contentDescription = "Mensajes"
-                        )
-                    },
-                    label = { Text("Mensajes") }
-                )
+    var selectedConversationId by remember {
+        mutableStateOf<String?>(null)
+    }
 
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    icon = {
-                        Icon(Icons.Default.Call, contentDescription = "Llamadas")
-                    },
-                    label = { Text("Llamadas") }
-                )
+    val selectedConversation = conversations.find {
+        it.id == selectedConversationId
+    }
 
-                NavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    icon = {
-                        Icon(Icons.Default.Settings, contentDescription = "Ajustes")
-                    },
-                    label = { Text("Ajustes") }
-                )
-            }
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-        ) {
-            when (selectedTab) {
-                0 -> MessagesScreen(conversations)
-                1 -> SimpleInfoScreen(
-                    title = "Llamadas",
-                    description = "El registro de llamadas se conectará en una siguiente mejora."
-                )
-                2 -> SimpleInfoScreen(
-                    title = "Ajustes",
-                    description = "Acceso a notificaciones y privacidad local."
-                )
-            }
+    if (selectedConversation != null) {
+        ChatScreen(
+            conversation = selectedConversation,
+            onBack = { selectedConversationId = null }
+        )
+    } else {
+        Scaffold { padding ->
+            MessagesScreen(
+                conversations = conversations,
+                onConversationClick = { conversation ->
+                    selectedConversationId = conversation.id
+                },
+                modifier = Modifier.padding(padding)
+            )
         }
     }
 }
 
 @Composable
-private fun MessagesScreen(conversations: List<ConversationEntity>) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+private fun MessagesScreen(
+    conversations: List<ConversationEntity>,
+    onConversationClick: (ConversationEntity) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxSize()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
             Text(
                 text = "Mensajes",
                 style = MaterialTheme.typography.headlineMedium
             )
+
             Text(
                 text = "Conversaciones capturadas de WhatsApp",
                 style = MaterialTheme.typography.bodyMedium,
@@ -137,14 +112,19 @@ private fun MessagesScreen(conversations: List<ConversationEntity>) {
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(bottom = 12.dp)
             ) {
                 items(
                     items = conversations,
                     key = { it.id }
                 ) { conversation ->
-                    ConversationRow(conversation)
+                    ConversationRow(
+                        conversation = conversation,
+                        onClick = {
+                            onConversationClick(conversation)
+                        }
+                    )
                     HorizontalDivider()
                 }
             }
@@ -153,7 +133,10 @@ private fun MessagesScreen(conversations: List<ConversationEntity>) {
 }
 
 @Composable
-private fun ConversationRow(conversation: ConversationEntity) {
+private fun ConversationRow(
+    conversation: ConversationEntity,
+    onClick: () -> Unit
+) {
     val dateText = remember(conversation.lastTimestamp) {
         DateFormat.getDateTimeInstance(
             DateFormat.SHORT,
@@ -164,7 +147,7 @@ private fun ConversationRow(conversation: ConversationEntity) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -173,7 +156,9 @@ private fun ConversationRow(conversation: ConversationEntity) {
             color = MaterialTheme.colorScheme.secondaryContainer,
             modifier = Modifier.size(48.dp)
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
                     text = conversation.contactName
                         .firstOrNull()
@@ -186,12 +171,16 @@ private fun ConversationRow(conversation: ConversationEntity) {
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
             Text(
                 text = conversation.contactName,
                 style = MaterialTheme.typography.titleMedium
             )
+
             Spacer(modifier = Modifier.height(4.dp))
+
             Text(
                 text = conversation.lastMessage,
                 style = MaterialTheme.typography.bodyMedium,
@@ -205,22 +194,6 @@ private fun ConversationRow(conversation: ConversationEntity) {
         Text(
             text = dateText,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun SimpleInfoScreen(title: String, description: String) {
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

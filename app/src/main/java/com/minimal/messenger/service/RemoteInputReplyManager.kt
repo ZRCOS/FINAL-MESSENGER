@@ -1,3 +1,4 @@
+```kotlin
 package com.minimal.messenger.service
 
 import android.app.PendingIntent
@@ -10,6 +11,7 @@ import com.minimal.messenger.data.local.MessageEntity
 import com.minimal.messenger.data.local.MinimalDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 object RemoteInputReplyManager {
 
@@ -26,14 +28,25 @@ object RemoteInputReplyManager {
         conversationId: String,
         replyText: String
     ): ReplyResult = withContext(Dispatchers.IO) {
-        val actionHolder = WhatsAppNotificationListenerService.activeRemoteInputs[conversationId]
-            ?: return@withContext ReplyResult.NotificationExpired
+
+        val text = replyText.trim()
+
+        if (text.isEmpty()) {
+            return@withContext ReplyResult.Error(
+                "Escribe un mensaje antes de enviarlo."
+            )
+        }
+
+        val actionHolder =
+            WhatsAppNotificationListenerService.activeRemoteInputs[conversationId]
+                ?: return@withContext ReplyResult.NotificationExpired
 
         try {
             val intent = Intent()
-            val bundle = Bundle()
+            val bundle = Bundle().apply {
+                putCharSequence(actionHolder.remoteInput.resultKey, text)
+            }
 
-            bundle.putCharSequence(actionHolder.remoteInput.resultKey, replyText)
             RemoteInput.addResultsToIntent(
                 arrayOf(actionHolder.remoteInput),
                 intent,
@@ -42,32 +55,40 @@ object RemoteInputReplyManager {
 
             actionHolder.pendingIntent.send(context, 0, intent)
 
+            val now = System.currentTimeMillis()
             val db = MinimalDatabase.getInstance(context)
+
             val sentMsg = MessageEntity(
-                id = "sent_" + System.currentTimeMillis(),
+                id = "sent_${UUID.randomUUID()}",
                 conversationId = conversationId,
                 sender = "user",
-                text = replyText,
-                timestamp = System.currentTimeMillis(),
+                text = text,
+                timestamp = now,
                 deliveryStatus = "sent_remote_input",
                 mediaType = "none",
                 notificationKey = actionHolder.notificationKey
             )
+
             db.minimalDao().insertMessage(sentMsg)
             db.minimalDao().updateConversationLastMessage(
                 conversationId,
-                replyText,
-                System.currentTimeMillis()
+                text,
+                now
             )
 
-            Log.i(TAG, "Respuesta despachada con éxito vía RemoteInput: $replyText")
+            Log.i(TAG, "Acción de respuesta enviada a Android.")
+
             ReplyResult.Success
+
         } catch (e: PendingIntent.CanceledException) {
-            Log.e(TAG, "El PendingIntent de la notificación ya expiró", e)
+            Log.w(TAG, "La acción de respuesta ya no está disponible.", e)
             ReplyResult.NotificationExpired
+
         } catch (e: Exception) {
-            Log.e(TAG, "Fallo al enviar respuesta RemoteInput", e)
-            ReplyResult.Error(e.localizedMessage ?: "Error desconocido")
+            Log.e(TAG, "Error al enviar la respuesta.", e)
+            ReplyResult.Error(
+                e.localizedMessage ?: "No se pudo enviar la respuesta."
+            )
         }
     }
 }
