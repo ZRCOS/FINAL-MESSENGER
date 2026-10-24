@@ -115,24 +115,27 @@ class WhatsAppNotificationListenerService : NotificationListenerService() {
             val action = NotificationCompat.getAction(notification, i) ?: continue
             val remoteInputs = action.remoteInputs ?: continue
 
-            for (ri in remoteInputs) {
-                if (ri.resultKey != null && action.actionIntent != null) {
-                    val nativeRemoteInput = RemoteInput.Builder(ri.resultKey)
-                        .setLabel(ri.label)
-                        .setChoices(ri.choices)
-                        .setAllowFreeFormInput(ri.allowFreeFormInput)
-                        .build()
+            
+for (ri in remoteInputs) {
+    val pendingIntent = action.actionIntent ?: continue
+    val resultKey = ri.resultKey ?: continue
 
-                    activeRemoteInputs[conversationId] = RemoteInputActionHolder(
-                        pendingIntent = action.actionIntent,
-                        remoteInput = nativeRemoteInput,
-                        notificationKey = notificationKey,
-                        timestamp = System.currentTimeMillis()
-                    )
-                    Log.d(TAG, "Acción RemoteInput registrada para: $conversationId")
-                    return
-                }
-            }
+    val nativeRemoteInput = RemoteInput.Builder(resultKey)
+        .setLabel(ri.label)
+        .setChoices(ri.choices)
+        .setAllowFreeFormInput(ri.allowFreeFormInput)
+        .build()
+
+    activeRemoteInputs[conversationId] = RemoteInputActionHolder(
+        pendingIntent = pendingIntent,
+        remoteInput = nativeRemoteInput,
+        notificationKey = notificationKey,
+        timestamp = System.currentTimeMillis()
+    )
+    Log.d(TAG, "Acción RemoteInput registrada para: $conversationId")
+    return
+}
+
         }
     }
 }
