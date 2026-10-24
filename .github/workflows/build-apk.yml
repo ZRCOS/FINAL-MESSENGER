@@ -23,9 +23,17 @@ jobs:
       - name: Otorgar permisos de ejecución a gradlew
         run: chmod +x gradlew || true
 
+      - name: Verificar configuración AndroidX
+        run: |
+          pwd
+          ls -la
+          find . -name gradle.properties -print
+          cat gradle.properties
+          grep -n "android.useAndroidX" gradle.properties
+
       - name: Compilar APK de Android (Debug)
         run: ./gradlew assembleDebug --no-daemon --stacktrace
-
+        
       - name: Publicar archivo APK descargable
         uses: actions/upload-artifact@v4
         with:
