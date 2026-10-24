@@ -1,4 +1,4 @@
-```yaml
+yaml
 name: Compilar APK Minimal Messenger
 
 on:
